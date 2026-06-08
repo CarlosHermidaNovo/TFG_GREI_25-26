@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+langchain
+langchain-community
+langchain-ollama
+psycopg2-binary
+sqlalchemy
+pyyaml
+requests

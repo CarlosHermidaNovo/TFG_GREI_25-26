@@ -1,0 +1,38 @@
+# === Volúmenes de Docker (estado de contenedores, NO subir) ===
+postgres_data/
+grafana_data/
+
+# === Python (backend, Sarimax y scripts de la raíz) ===
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+
+# === Next.js / Node (frontend) ===
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+
+# === Entorno y secretos ===
+.env
+.env.local
+.env*.local
+
+# === Artefactos de LaTeX (se mantiene solo el .tex) ===
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# === Varios ===
+debug_output.txt
+.DS_Store
+.idea/
+.vscode/

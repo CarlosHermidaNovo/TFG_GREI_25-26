@@ -1,0 +1,150 @@
+contexto_general:
+  pais: "España"
+  fuente_datos: "FAOSTAT y Datos Abiertos"
+  descripcion: "Conjunto de indicadores sobre seguridad alimentaria, agricultura, economía y demografía."
+
+datasets:
+  # --- BLOQUE ECONOMÍA Y POLÍTICA ---
+  - nombre: "PIB per cápita, PPA ($ a precios internacionales constantes de 2021) - Valor"
+    alias: ["PIB", "Producto Interior Bruto", "Riqueza per cápita"]
+    descripcion: "Producto Interior Bruto por habitante ajustado a paridad de poder adquisitivo."
+    unidad: "Dólares internacionales (Int$)"
+    insights: "Indica el nivel de vida económico. Una tendencia al alza es positiva. Caídas bruscas (como en 2009 o 2020) indican crisis económicas."
+
+  - nombre: "Estabilidad política y ausencia de violencia o terrorismo (índice) - Valor"
+    alias: ["Estabilidad Política", "Índice de estabilidad"]
+    descripcion: "Índice que mide la percepción de la probabilidad de inestabilidad política."
+    unidad: "Índice (-2.5 a 2.5)"
+    insights: "Valores más altos indican mayor estabilidad. Valores negativos indican riesgo. Es clave para la inversión extranjera."
+
+  - nombre: "Valor de las importaciones de alimentos respecto de las exportaciones totales de mercancías (%) (promedio de 3 años) - Valor"
+    alias: ["Importaciones alimentos vs Exportaciones", "Dependencia alimentaria comercial"]
+    descripcion: "Qué porcentaje de los ingresos por exportaciones se gasta en importar comida."
+    unidad: "%"
+    insights: "Un valor bajo es bueno para un país desarrollado, indica que no gasta todos sus ingresos externos solo en comer."
+
+  # --- BLOQUE DEMOGRAFÍA ---
+  - nombre: "Población-Estimaciones - Población urbana"
+    alias: ["Población en ciudades", "Urbanización"]
+    descripcion: "Número total de personas viviendo en áreas urbanas."
+    unidad: "Miles de personas"
+    insights: "Muestra la concentración en ciudades. El cruce con la población rural explica el éxodo rural."
+
+  - nombre: "Población-Estimaciones - Población rural"
+    alias: ["Población rural", "España vaciada"]
+    descripcion: "Número total de personas viviendo en áreas rurales."
+    unidad: "Miles de personas"
+    insights: "Una tendencia a la baja indica despoblación rural (la 'España Vaciada')."
+
+  # --- BLOQUE SALUD Y NUTRICIÓN ---
+  - nombre: "Prevalencia de la obesidad entre la población adulta (18 años y más) - Valor"
+    alias: ["Tasa de Obesidad", "Obesidad Adultos"]
+    descripcion: "Porcentaje de adultos con un Índice de Masa Corporal (IMC) ≥ 30."
+    unidad: "%"
+    insights: "Indicador crítico de salud pública. Una tendencia ascendente alerta sobre problemas cardiovasculares y costes sanitarios futuros."
+
+  - nombre: "Prevalencia de la anemia entre las mujeres en edad fértil (15-49 años) - Valor"
+    alias: ["Anemia Mujeres", "Deficiencia de hierro"]
+    descripcion: "Porcentaje de mujeres en edad reproductiva con niveles bajos de hemoglobina."
+    unidad: "%"
+    insights: "Indica deficiencias nutricionales (hierro). Afecta a la salud materna e infantil."
+
+  - nombre: "Número de personas que padecen inseguridad alimentaria moderada o grave (millones) (promedio de 3 años) - Valor"
+    alias: ["Inseguridad Alimentaria Total", "Personas con hambre"]
+    descripcion: "Cantidad de personas que no tienen acceso regular a alimentos nutritivos y suficientes."
+    unidad: "Millones de personas"
+    insights: "Mide el hambre y la precariedad. Debe analizarse junto a crisis económicas."
+
+  - nombre: "Prevalencia de la subalimentación (%) (promedio de 3 años) - Valor"
+    alias: ["Subalimentación", "Hambre crónica"]
+    descripcion: "Porcentaje de la población cuyo consumo de energía alimentaria es inferior al mínimo necesario."
+    unidad: "%"
+    insights: "En España suele ser muy bajo (<2.5%). Si sube, es una alerta social muy grave."
+
+  - nombre: "Variabilidad del suministro de alimentos per cápita (kcal/persona/día) - Valor"
+    alias: ["Estabilidad suministro alimentos"]
+    descripcion: "Fluctuación en la disponibilidad de comida."
+    unidad: "kcal/persona/día"
+    insights: "Valores bajos indican un suministro estable y seguro."
+
+  # --- BLOQUE DIETA Y ENERGÍA ---
+  - nombre: "Suficiencia del suministro medio de energía alimentaria (%) (promedio de 3 años) - Valor"
+    alias: ["Suficiencia calórica"]
+    descripcion: "Suministro de energía disponible en relación con los requerimientos medios."
+    unidad: "%"
+    insights: "Valores >100 indican que hay comida suficiente para todos. Valores muy altos pueden correlacionar con desperdicio o sobrealimentación."
+
+  - nombre: "Suministro medio de proteínas (g/persona/día) (promedio de 3 años) - Valor"
+    alias: ["Proteínas Totales"]
+    descripcion: "Cantidad media de proteína disponible por persona al día."
+    unidad: "g/persona/día"
+    insights: "Indicador de calidad de la dieta."
+
+  - nombre: "Suministro medio de proteínas de origen animal (g/persona/día) (promedio de 3 años) - Valor"
+    alias: ["Proteínas Animales"]
+    descripcion: "Cantidad de proteína proveniente de carne, pescado, huevos o lácteos."
+    unidad: "g/persona/día"
+    insights: "Indica cambios en el patrón dietético hacia dietas más ricas en carne."
+
+  # --- BLOQUE AGRICULTURA Y PRODUCCIÓN ---
+  - nombre: "Cereales, primarios - Producción"
+    alias: ["Producción de Cereales", "Cosecha de grano"]
+    descripcion: "Toneladas totales de cereales producidos."
+    unidad: "Toneladas"
+    insights: "Muy dependiente del clima (sequías). Afecta a los precios de los alimentos y piensos."
+
+  - nombre: "Cereales, primarios - Rendimiento"
+    alias: ["Rendimiento Cereales", "Productividad agrícola"]
+    descripcion: "Cantidad de cereales obtenidos por hectárea cultivada."
+    unidad: "kg/ha"
+    insights: "Mide la eficiencia tecnológica y el impacto del clima. Más kg/ha significa mejor aprovechamiento del suelo."
+
+  - nombre: "Nutriente nitrógeno N (total) - Uso Agrícola"
+    alias: ["Uso de Nitrógeno", "Fertilizantes Nitrogenados"]
+    descripcion: "Toneladas de fertilizante nitrogenado usado en agricultura."
+    unidad: "Toneladas"
+    insights: "Necesario para la producción, pero un uso excesivo causa contaminación de aguas (nitratos)."
+
+  - nombre: "Nutriente potasa K2O (total) - Uso Agrícola"
+    alias: ["Uso de Potasa"]
+    descripcion: "Consumo de fertilizantes de potasio."
+    unidad: "Toneladas"
+    insights: "Insumo clave para la calidad de los cultivos."
+
+  - nombre: "Fertilizantes fosfatados (total de nutrientes de P205) - Uso Agrícola"
+    alias: ["Uso de Fosfatos"]
+    descripcion: "Consumo de fertilizantes de fósforo."
+    unidad: "Toneladas"
+    insights: "Esencial para el crecimiento de raíces. Su precio suele estar ligado a mercados internacionales."
+
+  # --- BLOQUE USO DE LA TIERRA ---
+  - nombre: "Tierras arables - Superficie"
+    alias: ["Tierra de cultivo", "Superficie arable"]
+    descripcion: "Tierras dedicadas a cultivos temporales."
+    unidad: "1000 ha"
+    insights: "La reducción de tierra arable puede indicar abandono agrícola o urbanización."
+
+  - nombre: "Cultivos permanentes - Superficie"
+    alias: ["Cultivos leñosos", "Olivares y viñedos"]
+    descripcion: "Tierras con cultivos que ocupan el suelo por largos periodos (frutales, olivos, viñas)."
+    unidad: "1000 ha"
+    insights: "España tiene una gran superficie de cultivos permanentes (aceite, vino)."
+
+  # --- BLOQUE INFRAESTRUCTURA ---
+  - nombre: "Densidad de líneas de ferrocarril (por cada 100 km cuadrados de la superficie terrestre) - Valor"
+    alias: ["Red ferroviaria", "Trenes"]
+    descripcion: "Longitud de líneas de tren en relación al tamaño del país."
+    unidad: "km/100km²"
+    insights: "Indica el desarrollo de la infraestructura de transporte sostenible."
+
+  - nombre: "Porcentaje de la población que utiliza por lo menos servicios básicos de agua potable - Valor"
+    alias: ["Acceso agua potable"]
+    descripcion: "Cobertura de agua potable segura."
+    unidad: "%"
+    insights: "En España debe ser cercano al 100%. Mide desarrollo básico."
+
+  - nombre: "Porcentaje de la población que utiliza por lo menos servicios básicos de saneamiento - Valor"
+    alias: ["Acceso a saneamiento", "Alcantarillado"]
+    descripcion: "Porcentaje de personas con acceso a instalaciones sanitarias higiénicas."
+    unidad: "%"
+    insights: "Indicador básico de desarrollo e higiene pública."

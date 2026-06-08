@@ -1,0 +1,936 @@
+\documentclass[11pt, a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{geometry}
+\geometry{left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
+
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    breaklines=true,
+    showstringspaces=false,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    caption={},
+    captionpos=b
+}
+
+\begin{document}
+
+\chapter{Diseño e Implementación}
+\label{cap:diseño_implementacion}
+
+\section{Introducción}
+
+En este capítulo se describe el proceso de diseño e implementación de la solución informática propuesta. El sistema ha sido desarrollado siguiendo una metodología incremental, permitiendo la validación iterativa de requisitos y la incorporación temprana de feedback. Se presentan los componentes arquitectónicos clave, los modelos de datos, los diagramas UML que representan la estructura del sistema, y las decisiones tecnológicas tomadas durante el desarrollo.
+
+\section{Arquitectura de la Solución}
+
+\subsection{Visión General}
+
+A partir del análisis de requisitos funcionales y no funcionales expresado en el Capítulo 2, se ha diseñado una arquitectura de tres capas que separa claramente las responsabilidades de presentación, lógica de negocio e integración de datos:
+
+\begin{enumerate}
+    \item \textbf{Capa de Presentación (Frontend)}: Interfaz web responsiva desarrollada en Next.js con TypeScript.
+    \item \textbf{Capa de Lógica de Negocio (Agente IA)}: Motor de procesamiento basado en un Agente ReAct que ejecuta consultas complejas y orquesta las capacidades del LLM.
+    \item \textbf{Capa de Datos}: Sistema de gestión de bases de datos relacional (PostgreSQL) con un sistema de visualización (Grafana) para insights exploratorios.
+\end{enumerate}
+
+\subsection{Componentes Arquitectónicos}
+
+\subsubsection{Servicio Frontend (Next.js/React)}
+
+El frontend es una aplicación de página única (SPA) desarrollada en Next.js 14 con TypeScript. Sus responsabilidades principales son:
+
+\begin{itemize}
+    \item Proporcionar una interfaz conversacional intuitiva mediante un componente Chatbot embebido.
+    \item Mostrar visualizaciones interactivas incrustadas desde Grafana.
+    \item Permitir la exploración dinámica de indicadores mediante comandos en lenguaje natural.
+    \item Gestionar el estado del cliente y la comunicación asíncrona con el backend.
+\end{itemize}
+
+\textbf{Stack Tecnológico del Frontend:}
+\begin{itemize}
+    \item \textbf{Framework}: Next.js 14 (con App Router)
+    \item \textbf{Lenguaje}: TypeScript
+    \item \textbf{Stilización}: Tailwind CSS + shadcn/ui
+    \item \textbf{Gestión de Estado}: Context API + Hooks
+    \item \textbf{Comunicación}: Fetch API con manejo de errores
+\end{itemize}
+
+\subsubsection{Servicio Backend (FastAPI + LLM)}
+
+El backend actúa como orquestador central del sistema. Está dividido en dos capas funcionales:
+
+\paragraph{API REST (FastAPI)}
+
+FastAPI proporciona los endpoints HTTP que exponen las capacidades de conversación e integración de datos:
+
+\begin{itemize}
+    \item \texttt{POST /chat}: Recibe mensajes del usuario y devuelve respuestas generadas por el agente.
+    \item \texttt{GET /}: Health check para validar el estado del servicio.
+\end{itemize}
+
+\paragraph{Agente Conversacional (LangGraph ReAct)}
+
+El agente es el corazón lógico del sistema. Implementa el patrón \textit{ReAct} (Reasoning + Acting) mediante LangGraph, que permite al LLM entrelazar momentos de reflexión con la ejecución de acciones deterministas. El agente dispone de las siguientes herramientas:
+
+\begin{enumerate}
+    \item \textbf{buscar\_y\_graficar(query)}: Identifica métricas en configuración YAML y genera URLs de Grafana para visualización.
+    \item \textbf{ejecutar\_query\_sql(sql)}: Traduce consultas en lenguaje natural a SQL y ejecuta operaciones de lectura en PostgreSQL.
+    \item \textbf{listar\_métricas()}: Proporciona información sobre el conjunto de datos disponibles.
+\end{enumerate}
+
+El agente utiliza:
+\begin{itemize}
+    \item \textbf{LLM Backend}: Ollama con el modelo Llama 3.1 (ejecución local, privada).
+    \item \textbf{Temperature}: 0 para reproducibilidad y consistencia.
+    \item \textbf{Framework de Orquestación}: LangGraph para control del flujo de razonamiento.
+\end{itemize}
+
+\textbf{Stack Tecnológico del Backend:}
+\begin{itemize}
+    \item \textbf{Framework Web}: FastAPI
+    \item \textbf{Lenguaje}: Python 3.10+
+    \item \textbf{Orquestación IA}: LangGraph + LangChain
+    \item \textbf{LLM}: Ollama (modelo Llama 3.1)
+    \item \textbf{ORM/Queries}: SQLAlchemy + psycopg2
+\end{itemize}
+
+\subsubsection{Sistema de Gestión de Datos}
+
+\paragraph{Base de Datos (PostgreSQL)}
+
+PostgreSQL es la base de datos principal del sistema. Almacena:
+
+\begin{itemize}
+    \item \textbf{Datos Tiempo-Series}: Indicadores agregados por año y geografía (país).
+    \item \textbf{Metadatos}: Descripciones de métricas, unidades e información sobre fuentes.
+    \item \textbf{Información Geográfica}: Jerarquía de ubicaciones (País → Región potencial).
+\end{itemize}
+
+Select para conectar con el backend: \texttt{postgresql://admin:admin@localhost:5433/base\_datos\_v3}
+
+\paragraph{Sistema de Visualización (Grafana)}
+
+Grafana actúa como capa de presentación visual. Sus funciones son:
+
+\begin{itemize}
+    \item Proporcionar dashboards interactivos específicos para cada métrica.
+    \item Permitir la incrustación de gráficos en el frontend mediante URLs parametrizadas.
+    \item Ofrecer filtros dinámicos y capacidades de drill-down en series temporales.
+\end{itemize}
+
+El agente genera URLs de Grafana con parámetros que especifican la métrica a visualizar, permitiendo una experiencia fluida donde el usuario consulta en lenguaje natural y recibe un gráfico incrustado sin abandonar la interfaz.
+
+\subsubsection{Orquestación e Infraestructura}
+
+Todos los servicios se despliegan mediante Docker Compose, asegurando:
+
+\begin{itemize}
+    \item \textbf{Reproducibilidad}: Mismo entorno en desarrollo y producción.
+    \item \textbf{Aislamiento}: Cada servicio se ejecuta en su propio contenedor.
+    \item \textbf{Facilidad de Desarrollo}: Levantamiento del stack completo con un único comando.
+\end{itemize}
+
+\subsection{Diagrama Arquitectónico}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.9]
+    % Usuarios
+    \node[draw, rectangle, minimum width=2cm, minimum height=1cm] (user) at (0, 8) {Usuario};
+    
+    % Frontend
+    \node[draw, rectangle, minimum width=3cm, minimum height=1cm, fill=blue!20] (frontend) at (0, 6) {Frontend Web \\ (Next.js/React)};
+    
+    % Backend
+    \node[draw, rectangle, minimum width=3cm, minimum height=1cm, fill=green!20] (backend) at (0, 4) {Backend \\ (FastAPI)};
+    
+    % Agent
+    \node[draw, rectangle, minimum width=3cm, minimum height=1cm, fill=orange!20] (agent) at (3.5, 4) {Agente ReAct \\ (LangGraph)};
+    
+    % LLM
+    \node[draw, rectangle, minimum width=3cm, minimum height=1cm, fill=red!20] (llm) at (7, 4) {LLM Ollama \\ (Llama 3.1)};
+    
+    % Database
+    \node[draw, rectangle, minimum width=2.5cm, minimum height=1cm, fill=cyan!20] (db) at (-3.5, 2) {PostgreSQL};
+    
+    % Grafana
+    \node[draw, rectangle, minimum width=2.5cm, minimum height=1cm, fill=purple!20] (grafana) at (3.5, 2) {Grafana \\ (Visualización)};
+    
+    % Arrows
+    \draw[->, thick] (user) -- (frontend);
+    \draw[->, thick] (frontend) -- (backend);
+    \draw[<->, thick] (backend) -- (agent);
+    \draw[->, thick] (agent) -- (llm);
+    \draw[<->, thick] (backend) -- (db);
+    \draw[<->, thick] (agent) -- (db);
+    \draw[->, thick] (backend) -- (grafana);
+    \draw[<->, thick] (grafana) -- (db);
+    \draw[->, thick] (grafana) -- (frontend);
+    
+    % Leyendas
+    \node[font=\small] at (-5, 5.5) {HTTP};
+    \node[font=\small] at (2.5, 3) {Tools};
+    \node[font=\small] at (5.25, 3) {Prompt};
+    \node[font=\small] at (-2, 1) {SQL};
+    \node[font=\small] at (1.5, 1) {SQL};
+    
+\end{tikzpicture}
+\caption{Arquitectura general del sistema SOS Food - Prototipo Local}
+\label{fig:arquitectura_general}
+\end{figure}
+
+\section{Modelo de Datos}
+
+\subsection{Modelo Conceptual}
+
+El sistema maneja datos sobre sostenibilidad alimentaria organizados en un modelo conceptual sencillo pero extensible. El modelo identifica las siguientes entidades principales:
+
+\begin{itemize}
+    \item \textbf{Geografía}: Representa ubicaciones a nivel de país.
+    \item \textbf{Tiempo}: Series temporales anuales (2000-2023).
+    \item \textbf{Métricas}: Indicadores sobre agricultura, nutrición, economía y seguridad alimentaria.
+    \item \textbf{Valores}: Observaciones específicas de una métrica en un país y año dado.
+\end{itemize}
+
+\subsection{Diagrama de Entidad-Relación}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[>=stealth, node distance=2cm]
+    % Entidades
+    \node[draw, rectangle, minimum width=2cm, minimum height=2cm] (geography) at (0, 2) {
+        \textbf{Geography} \\
+        \hrule
+        id \\
+        país \\
+        código\_iso \\
+        región
+    };
+    
+    \node[draw, rectangle, minimum width=2cm, minimum height=2cm] (metric) at (4, 2) {
+        \textbf{Metrics} \\
+        \hrule
+        id \\
+        nombre \\
+        alias \\
+        categoría \\
+        descripción
+    };
+    
+    \node[draw, rectangle, minimum width=2cm, minimum height=2cm] (values) at (2, -1) {
+        \textbf{Values} \\
+        \hrule
+        id \\
+        metric\_id (FK) \\
+        geography\_id (FK) \\
+        año \\
+        valor \\
+        timestamp
+    };
+    
+    \node[draw, rectangle, minimum width=2cm, minimum height=1.5cm] (source) at (-2.5, -1) {
+        \textbf{Source} \\
+        \hrule
+        id \\
+        nombre \\
+        url \\
+        fecha\_descarga
+    };
+    
+    % Relaciones
+    \draw[<->, thick] (geography) -| (values);
+    \draw[<->, thick] (metric) -| (values);
+    \draw[<-, thick] (values) -- (-0.5, -1) -- (-1.25, -1);
+    
+    % Anotaciones
+    \node[font=\small] at (1, 0.5) {1:N};
+    \node[font=\small] at (3, 0.5) {1:N};
+    
+\end{tikzpicture}
+\caption{Diagrama de Entidad-Relación del sistema de datos}
+\label{fig:er_diagram}
+\end{figure}
+
+\subsection{Descripción de Tablas}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|p{2cm}|p{4cm}|p{8cm}|}
+\hline
+\textbf{Tabla} & \textbf{Columnas Principales} & \textbf{Descripción} \\
+\hline
+\texttt{geography} & id, país, código\_iso, región & Almacena información geográfica. España en este prototipo. \\
+\hline
+\texttt{metrics} & id, nombre, alias, categoría, descripción & Define las métricas disponibles (PIB, obesidad, producción agrícola, etc.). \\
+\hline
+\texttt{values} & id, metric\_id, geography\_id, año, valor & Almacena observaciones tiempo-series de cada métrica. \\
+\hline
+\texttt{source} & id, nombre, url, fecha\_descarga & Metadatos sobre las fuentes de datos originales (FAOSTAT, Datos Abiertos, etc.). \\
+\hline
+\end{tabular}
+\caption{Esquema de tablas principales en PostgreSQL}
+\label{tab:schema}
+\end{table}
+
+\subsection{Configuración de Métricas}
+
+Las métricas disponibles se especifican en un archivo de configuración YAML (\texttt{config.yaml}) que es leído por el agente al inicializar. Este enfoque permite:
+
+\begin{itemize}
+    \item Agregar nuevas métricas sin modificar código.
+    \item Definir alias para cada métrica facilitando el reconocimiento por el NLU.
+    \item Vincular cada métrica con su visualización en Grafana.
+\end{itemize}
+
+Ejemplo de entrada de configuración:
+\begin{lstlisting}[language=yaml, caption=Extracto de config.yaml]
+datasets:
+  - nombre: "Producto Interno Bruto (PIB)"
+    alias: ["PIB", "producto interno", "GDP", "PBI"]
+    categoria: "Economía"
+    descripcion: "PIB nominal en millones USD, FAOSTAT"
+    dashboard_id: "adj4dk7"
+    
+  - nombre: "Población Rural"
+    alias: ["población rural", "rural", "habitadores rurales"]
+    categoria: "Demografía"
+    descripcion: "Porcentaje de población que vive en áreas rurales"
+    dashboard_id: "adj4dk7"
+\end{lstlisting}
+
+\section{Diagrama de Clases UML}
+
+\subsection{Estructura de Clases del Agente}
+
+El sistema define un conjunto de clases especializadas para modelar la lógica del agente. La Figura \ref{fig:uml_classes} presenta el diagrama de clases UML que muestra las dependencias entre componentes principales.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.85, node distance=3cm]
+    % Clase FastAPI App
+    \node[draw, rectangle split, rectangle split parts=3, minimum width=3cm] (fastapi) at (0, 6) {
+        \textbf{FastAPIApp}
+        \nodepart{second}
+        - app: FastAPI \\
+        - origins: List[str]
+        \nodepart{third}
+        + read\_root() \\
+        + chat\_endpoint()
+    };
+    
+    % Clase Agent
+    \node[draw, rectangle split, rectangle split parts=3, minimum width=3cm] (agent) at (5, 6) {
+        \textbf{ReActAgent}
+        \nodepart{second}
+        - llm: ChatOllama \\
+        - tools: Tool[] \\
+        - executor: Executor
+        \nodepart{third}
+        + invoke(input) \\
+        + think\_and\_act()
+    };
+    
+    % Clase Tools
+    \node[draw, rectangle split, rectangle split parts=3, minimum width=3cm] (tools) at (10, 6) {
+        \textbf{ToolExecutor}
+        \nodepart{second}
+        - db\_connection \\
+        - grafana\_config
+        \nodepart{third}
+        + buscar\_y\_graficar() \\
+        + ejecutar\_query\_sql() \\
+        + listar\_métricas()
+    };
+    
+    % Clase Database
+    \node[draw, rectangle split, rectangle split parts=3, minimum width=3cm] (db) at (0, 2) {
+        \textbf{DatabaseConnection}
+        \nodepart{second}
+        - engine: SQLAlchemy \\
+        - url: str
+        \nodepart{third}
+        + run\_query(sql) \\
+        + get\_connection()
+    };
+    
+    % Clase LLM
+    \node[draw, rectangle split, rectangle split parts=3, minimum width=3cm] (llm_class) at (5, 2) {
+        \textbf{OllamaLLM}
+        \nodepart{second}
+        - model: str \\
+        - temperature: float \\
+        - host: str
+        \nodepart{third}
+        + generate(prompt) \\
+        + invoke(messages)
+    };
+    
+    % Clase Grafana
+    \node[draw, rectangle split, rectangle split parts=3, minimum width=3cm] (grafana_class) at (10, 2) {
+        \textbf{GrafanaClient}
+        \nodepart{second}
+        - base\_url: str \\
+        - dashboard\_uid: str
+        \nodepart{third}
+        + build\_url(metric) \\
+        + embed\_panel()
+    };
+    
+    % Relaciones
+    \draw[->, thick] (fastapi) -- (agent) node[midway, above] {usa};
+    \draw[->, thick] (agent) -- (tools) node[midway, above] {contiene};
+    \draw[->, thick] (agent) -- (llm_class) node[midway, left] {invoca};
+    \draw[->, thick] (tools) -- (db) node[midway, left] {query};
+    \draw[->, thick] (tools) -- (grafana_class) node[midway, right] {genera URLs};
+    \draw[->, thick] (db) -- (llm_class) node[midway, below] {contexto};
+    
+\end{tikzpicture}
+\caption{Diagrama de Clases UML del sistema backend}
+\label{fig:uml_classes}
+\end{figure}
+
+\subsection{Patrón ReAct del Agente}
+
+El agente sigue el patrón ReAct, que alterna entre fases de razonamiento (Reasoning) y actuación (Acting):
+
+\begin{enumerate}
+    \item \textbf{Pensamiento (Thought)}: El LLM analiza la entrada del usuario y decide qué herramienta usar.
+    \item \textbf{Acción (Action)}: Se ejecuta la herramienta seleccionada (query SQL, búsqueda de métricas, etc.).
+    \item \textbf{Observación (Observation)}: El resultado de la acción se proporciona al agente como contexto.
+    \item \textbf{Reflexión (Reflection)}: El LLM procesa el resultado y formula una respuesta natural.
+\end{enumerate}
+
+Este ciclo se repite hasta que el agente determina que la pregunta ha sido respondida adecuadamente.
+
+\section{Diagrama de Actividad}
+
+\subsection{Flujo de Conversación del Agente}
+
+El diagrama de actividad (Figura \ref{fig:activity_diagram}) ilustra los pasos principales en el procesamiento de una conversación del usuario:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=2cm, >=stealth]
+    % Inicio
+    \node[draw, circle, fill=black!30, minimum size=0.6cm] (start) at (0, 10) {};
+    
+    % Recibir entrada
+    \node[draw, rectangle, minimum width=3cm, minimum height=0.8cm] (input) at (0, 8.5) {Recibir mensaje usuario};
+    
+    % Normalizar
+    \node[draw, rectangle, minimum width=3cm, minimum height=0.8cm] (normalize) at (0, 7) {Normalizar texto};
+    
+    % LLM Reasoning
+    \node[draw, rectangle, minimum width=3cm, minimum height=0.8cm] (reason) at (0, 5.5) {LLM: ¿Qué hacer?};
+    
+    % Decisión
+    \node[draw, diamond, minimum width=2.5cm, minimum height=1.5cm] (decision) at (0, 3.5) {¿Usar tool?};
+    
+    % Rama 1: Usar Tool
+    \node[draw, rectangle, minimum width=3cm, minimum height=0.8cm] (tool1) at (-3, 1.5) {Ejecutar herramienta};
+    \node[draw, rectangle, minimum width=3cm, minimum height=0.8cm] (observe) at (-3, 0) {Recibir resultado};
+    
+    % Rama 2: Respuesta Directa
+    \node[draw, rectangle, minimum width=3cm, minimum height=0.8cm] (direct) at (3, 1.5) {Generar respuesta};
+    
+    % Convergencia
+    \node[draw, rectangle, minimum width=3cm, minimum height=0.8cm] (format) at (0, -1.5) {Format respuesta};
+    
+    % Fin
+    \node[draw, circle, fill=black!30, minimum size=0.6cm] (end) at (0, -3) {};
+    
+    % Flechas
+    \draw[->, thick] (start) -- (input);
+    \draw[->, thick] (input) -- (normalize);
+    \draw[->, thick] (normalize) -- (reason);
+    \draw[->, thick] (reason) -- (decision);
+    \draw[->, thick] (decision) -- node[left] {Sí} (tool1);
+    \draw[->, thick] (decision) -- node[right] {No} (direct);
+    \draw[->, thick] (tool1) -- (observe);
+    \draw[->, thick] (observe) -| (format);
+    \draw[->, thick] (direct) -| (format);
+    \draw[->, thick] (format) -- (end);
+    
+    % Ciclo de feedback
+    \draw[->, thick, dotted] (observe) -- (-3, 4) -- (reason) node[midway, above] {contexto};
+    
+\end{tikzpicture}
+\caption{Diagrama de Actividad: flujo de procesamiento del agente conversacional}
+\label{fig:activity_diagram}
+\end{figure}
+
+\subsection{Flujo de Visualización Dinámica}
+
+Otro flujo importante es la generación dinámica de gráficos mediante el agente:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=2.5cm, >=stealth]
+    % Inicio
+    \node[draw, circle, fill=black!30, minimum size=0.6cm] (start2) at (0, 6) {};
+    
+    % Detectar solicitud de visualización
+    \node[draw, rectangle, minimum width=3.5cm, minimum height=0.8cm] (detect) at (0, 4.5) {¿Solicitud de visualización?};
+    
+    % Búsqueda de métrica
+    \node[draw, rectangle, minimum width=3.5cm, minimum height=0.8cm] (search) at (0, 3) {Buscar métrica en config.yaml};
+    
+    % Decision
+    \node[draw, diamond, minimum width=2cm, minimum height=1.2cm] (found) at (0, 1.5) {¿Encontrada?};
+    
+    % Rama Sí
+    \node[draw, rectangle, minimum width=3.5cm, minimum height=0.8cm] (buildurl) at (-2.5, 0) {Construir URL Grafana};
+    
+    % Rama No
+    \node[draw, rectangle, minimum width=3.5cm, minimum height=0.8cm] (suggest) at (2.5, 0) {Sugerir métricas similares};
+    
+    % Convergencia
+    \node[draw, rectangle, minimum width=3.5cm, minimum height=0.8cm] (response) at (0, -1.5) {Enviar al frontend (JSON)};
+    
+    % Fin
+    \node[draw, circle, fill=black!30, minimum size=0.6cm] (end2) at (0, -3) {};
+    
+    % Flechas
+    \draw[->, thick] (start2) -- (detect);
+    \draw[->, thick] (detect) -- (search);
+    \draw[->, thick] (search) -- (found);
+    \draw[->, thick] (found) -- node[above left] {Sí} (buildurl);
+    \draw[->, thick] (found) -- node[above right] {No} (suggest);
+    \draw[->, thick] (buildurl) -- (response);
+    \draw[->, thick] (suggest) -- (response);
+    \draw[->, thick] (response) -- (end2);
+    
+\end{tikzpicture}
+\caption{Diagrama de Actividad: generación dinámica de gráficos con Grafana}
+\label{fig:activity_viz}
+\end{figure}
+
+\section{Diagrama de Estados}
+
+\subsection{Estados del Agente}
+
+El agente conversacional transita entre varios estados bien definidos durante su ejecución:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=3cm, >=stealth]
+    % Estados
+    \node[draw, circle, minimum size=1.2cm, fill=lightblue] (idle) at (0, 4) {\textbf{Idle}};
+    \node[draw, circle, minimum size=1.2cm, fill=lightyellow] (processing) at (3, 4) {\textbf{Processing}};
+    \node[draw, circle, minimum size=1.2cm, fill=lightgreen] (tool_exec) at (6, 4) {\textbf{Tool Exec}};
+    \node[draw, circle, minimum size=1.2cm, fill=lightcyan] (thinking) at (4.5, 1.5) {\textbf{Thinking}};
+    \node[draw, circle, minimum size=1.2cm, fill=lightyellow] (response_gen) at (1.5, 1.5) {\textbf{Response Gen}};
+    \node[draw, circle, minimum size=1.2cm, fill=lightgray] (error) at (9, 2.5) {\textbf{Error}};
+    
+    % Transiciones
+    \draw[->, thick] (idle) -- node[above] {mensaje} (processing);
+    \draw[->, thick] (processing) -- node[above] {requiere tool} (tool_exec);
+    \draw[->, thick] (tool_exec) -- node[right] {ejecutado} (thinking);
+    \draw[->, thick] (thinking) -- node[below left] {continuar} (response_gen);
+    \draw[->, thick] (response_gen) -- node[left] {respuesta lista} (idle);
+    
+    % Ciclo de reflexión
+    \draw[->, thick, dotted] (thinking) .. controls (7, 2) .. (tool_exec) node[midway, right] {iterar};
+    
+    % Manejo de errores
+    \draw[->, thick] (processing) -- node[right] {excepción} (error);
+    \draw[->, thick] (tool_exec) -- node[above] {fallo} (error);
+    \draw[->, thick] (error) -- node[below right] {recuperación} (idle);
+    
+\end{tikzpicture}
+\caption{Diagrama de Estados del Agente Conversacional}
+\label{fig:state_diagram}
+\end{figure}
+
+\subsection{Descripción de Estados}
+
+\begin{description}
+    \item[\textbf{Idle}]: Estado de espera. El agente está listo para recibir nuevas entradas.
+    
+    \item[\textbf{Processing}]: El agente ha recibido una entrada del usuario y está analizando si necesita ejecutar herramientas.
+    
+    \item[\textbf{Tool Execution}]: Una herramienta está siendo ejecutada (query SQL, búsqueda de métricas, obtención de datos de Grafana).
+    
+    \item[\textbf{Thinking}]: El LLM reflexiona sobre los resultados obtenidos de la herramienta y decide si necesita más información o puede generar una respuesta final.
+    
+    \item[\textbf{Response Generation}]: El agente formula una respuesta final en lenguaje natural, posiblemente con referencias a URLs de visualización.
+    
+    \item[\textbf{Error}]: Se ha producido una excepción (conexión BD no disponible, métrica desconocida, etc.). El sistema intenta recuperación o devuelve un mensaje de error al usuario.
+\end{description}
+
+\section{Implementación del Proyecto}
+
+\subsection{Metodología de Desarrollo}
+
+El desarrollo del sistema se ha realizado usando una aproximación \textit{incremental} y \textit{iterativa}. En lugar de implementar todos los requisitos de una vez, el proyecto se dividió en ciclos semanales de desarrollo, donde cada semana añadía funcionalidad validada y probada.
+
+\subsubsection{Ventajas del Enfoque Incremental}
+
+\begin{enumerate}
+    \item \textbf{Validación temprana}: Cada incremento permite validar supuestos con pruebas reales.
+    \item \textbf{Reducción de riesgos}: Los problemas se detectan pronto, cuando el costo de corregir es menor.
+    \item \textbf{Feedback iterativo}: Permite incorporar cambios basados en pruebas y observaciones.
+    \item \textbf{Motivación}: La entrega de funcionalidades tempranas mantiene el momentum del proyecto.
+\end{enumerate}
+
+\subsection{Plan de Desarrollo por Semanas}
+
+\subsubsection{Semana 1: Configuración del Entorno y ETL Básico}
+
+\textbf{Objetivos:}
+\begin{itemize}
+    \item Establecer la infraestructura de desarrollo con Docker Compose.
+    \item Descargar e importar datasets de FAOSTAT.
+    \item Crear scripts de ETL automáticos para normalizar datos.
+\end{itemize}
+
+\textbf{Actividades Clave:}
+\begin{itemize}
+    \item Creación de \texttt{docker-compose.yml} con servicios PostgreSQL y Grafana.
+    \item Implementación de script \texttt{etl\_loader.py} para ingestar CSVs en la BD.
+    \item Validación de integridad de datos post-carga.
+\end{itemize}
+
+\textbf{Decisiones Tecnológicas:}
+\begin{itemize}
+    \item Elegir PostgreSQL sobre SQLite para mejor escalabilidad y features analíticos.
+    \item Usar Docker para garantizar reproducibilidad (mismo entorno en local, CI/CD, producción).
+\end{itemize}
+
+\textbf{Artefactos Generados:}
+\begin{itemize}
+    \item Script de carga: \texttt{etl\_loader.py}
+    \item Esquema SQL inicial con tablas de geografía, métricas y valores.
+    \item Stack de infraestructura containerizada.
+\end{itemize}
+
+\subsubsection{Semana 2: Backend API y Agente Conversacional Básico}
+
+\textbf{Objetivos:}
+\begin{itemize}
+    \item Implementar la API REST en FastAPI.
+    \item Crear el primer prototipo del agente conversacional.
+    \item Integrar conexión a Ollama con Llama 3.1.
+\end{itemize}
+
+\textbf{Actividades Clave:}
+\begin{itemize}
+    \item Creación de estructura base en \texttt{backend/main.py} con endpoint \texttt{POST /chat}.
+    \item Implementación de \texttt{agent.py} con patrón ReAct usando LangGraph.
+    \item Configuración de Ollama como servicio local de LLM.
+    \item Primera herramienta: \texttt{listar\_métricas()} para exploración de datos.
+\end{itemize}
+
+\textbf{Decisiones Tecnológicas:}
+\begin{itemize}
+    \item Elegir FastAPI por su rendimiento, documentación automática y soporte asíncrono.
+    \item Usar Ollama en lugar de APIs cloud para garantizar privacidad y control local.
+    \item Implementar ReAct desde el inicio para capacidades reflexivas del agente.
+\end{itemize}
+
+\textbf{Artefactos Generados:}
+\begin{itemize}
+    \item API REST funcional con CORS configurado.
+    \item Agente ReAct básico con una herramienta (listar métricas).
+    \item Configuración de Ollama integrada.
+\end{itemize}
+
+\subsubsection{Semana 3: Herramientas de Consulta SQL y Visualización}
+
+\textbf{Objetivos:}
+\begin{itemize}
+    \item Implementar la herramienta \texttt{ejecutar\_query\_sql()} permitiendo al agente consultar datos.
+    \item Integrar Grafana como capa de visualización.
+    \item Crear herramienta \texttt{buscar\_y\_graficar()} para generar URLs de gráficos.
+\end{itemize}
+
+\textbf{Actividades Clave:}
+\begin{itemize}
+    \item Desarrollo de módulo \texttt{database.py} con manejo seguro de queries SQL.
+    \item Creación de dashboards en Grafana parametrizados por métrica.
+    \item Implementación de generador de URLs dinamicas para incrustación de gráficos.
+    \item Pruebas e2e del viaje usuario: pregunta → SQL → gráfico.
+\end{itemize}
+
+\textbf{Decisiones Tecnológicas:}
+\begin{itemize}
+    \item Usar SQLAlchemy con parámetros seguros para prevenir SQL injection.
+    \item Almacenar configuración de métricas en YAML (flexible, sin recompilación necesaria).
+    \item Embeber gráficos de Grafana en lugar de recrearlos (aprovecha capacidades de Grafana).
+\end{itemize}
+
+\textbf{Artefactos Generados:}
+\begin{itemize}
+    \item Módulo de BD con queries SQL dinámicas y seguras.
+    \item Archivo \texttt{config.yaml} con mapeo métrica → alias → dashboard.
+    \item Dashboards Grafana con filtros parametrizados.
+\end{itemize}
+
+\subsubsection{Semana 4: Frontend Web Conversacional}
+
+\textbf{Objetivos:}
+\begin{itemize}
+    \item Desarrollar interfaz Next.js con componente Chat.
+    \item Implementar visualización de gráficos incrustados de Grafana.
+    \item Crear dashboard de exploración de métricas.
+\end{itemize}
+
+\textbf{Actividades Clave:}
+\begin{itemize}
+    \item Scaffolding de Next.js 14 con TypeScript.
+    \item Desarrollo componente \texttt{Chatbot.tsx} con historial y autoformato.
+    \item Componente \texttt{DynamicVisualization.tsx} para embeber gráficos.
+    \item Integración con endpoint \texttt{POST /chat} del backend.
+    \item Styling con Tailwind CSS para interfaz profesional.
+\end{itemize}
+
+\textbf{Decisiones Tecnológicas:}
+\begin{itemize}
+    \item Usar Next.js 14 con App Router para arquitectura moderna.
+    \item TypeScript para type-safety en cliente (previene bugs de tipado).
+    \item Tailwind CSS + shadcn/ui para UI profesional sin dependencias pesadas.
+\end{itemize}
+
+\textbf{Artefactos Generados:}
+\begin{itemize}
+    \item Aplicación web responsiva con React.
+    \item Componente de chat con historial persistente.
+    \item Integración visual con Grafana embebido.
+\end{itemize}
+
+\subsubsection{Semana 5: Mejoras de Precisión y Resiliencia}
+
+\textbf{Objetivos:}
+\begin{itemize}
+    \item Mejorar precisión del reconocimiento de métricas mediante prompt engineering.
+    \item Implementar manejo robusto de errores.
+    \item Agregar búsqueda fuzzy para alias de métricas.
+\end{itemize}
+
+\textbf{Actividades Clave:}
+\begin{itemize}
+    \item Refinamiento de prompts del sistema para el agente (instrucciones claras sobre disponibilidad de datos).
+    \item Implementación de búsqueda fuzzy usando \texttt{difflib} al reconocer métricas.
+    \item Manejo detallado de excepciones y mensajes informativos.
+    \item Logging comprensivo para debugging en producción.
+\end{itemize}
+
+\textbf{Decisiones Tecnológicas:}
+\begin{itemize}
+    \item Usar búsqueda fuzzy antes de réplicas en BD para velocidad.
+    \item Mantener logs estructurados (facilita análisis de problemas).
+    \item Información útil en errores al usuario final (no exponer detalles técnicos innecesarios).
+\end{itemize}
+
+\textbf{Artefactos Generados:}
+\begin{itemize}
+    \item Prompts optimizados para el agente.
+    \item Sistema de match fuzzy para métricas.
+    \item Logging centralizado y manejo de excepciones mejorado.
+\end{itemize}
+
+\subsubsection{Semana 6: Testing, Documentación y Optimización}
+
+\textbf{Objetivos:}
+\begin{itemize}
+    \item Crear suite de tests automatizados.
+    \item Documentar arquitectura y decisiones de diseño.
+    \item Optimizar rendimiento de consultas y latencia del agente.
+\end{itemize}
+
+\textbf{Actividades Clave:}
+\begin{itemize}
+    \item Unit tests para funciones de utilidad (parsing de queries, generación de URLs).
+    \item Integration tests para flujos end-to-end (usuario → chat → gráfico).
+    \item Documentación con OpenAPI/Swagger automática (FastAPI).
+    \item Análisis de performance: latencia de respuesta, uso de memoria.
+    \item Caching de queries frecuentes en BD.
+\end{itemize}
+
+\textbf{Decisiones Tecnológicas:}
+\begin{itemize}
+    \item Usar \texttt{pytest} para tests (estándar en Python).
+    \item Implementar caché de queries frecuentes en RAMou Redis (si escalaria).
+    \item Documentación generada automáticamente cuando sea posible.
+\end{itemize}
+
+\textbf{Artefactos Generados:}
+\begin{itemize}
+    \item Suite de tests significativa (>80\% cobertura de código crítico).
+    \item Documentación de arquitectura y API.
+    \item Benchmarks de performance.
+\end{itemize}
+
+\subsection{Timeline Visual}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.8]
+    \draw[thick] (0,0) -- (16,0);
+    
+    % Hitos semanales
+    \foreach \x/\label in {0/Sem 1, 3/Sem 2, 6/Sem 3, 9/Sem 4, 12/Sem 5, 15/Sem 6} {
+        \draw[thick] (\x,0) -- (\x,-0.3);
+        \node[below] at (\x,-0.5) {\label};
+    }
+    
+    % Features
+    \draw[fill=blue!30, draw=blue, thick] (0,1) rectangle (3,1.5) node[midway] {\textbf{Setup + ETL}};
+    \draw[fill=green!30, draw=green, thick] (3,1) rectangle (6,1.5) node[midway] {\textbf{Backend + LLM}};
+    \draw[fill=orange!30, draw=orange, thick] (6,1) rectangle (9,1.5) node[midway] {\textbf{Queries + Viz}};
+    \draw[fill=red!30, draw=red, thick] (9,1) rectangle (12,1.5) node[midway] {\textbf{Frontend}};
+    \draw[fill=yellow!30, draw=yellow, thick] (12,1) rectangle (15,1.5) node[midway] {\textbf{Precisión}};
+    \draw[fill=purple!30, draw=purple, thick] (15,1) rectangle (18,1.5) node[midway] {\textbf{Testing}};
+    
+\end{tikzpicture}
+\caption{Timeline de desarrollo incremental del proyecto}
+\label{fig:timeline}
+\end{figure}
+
+\subsection{Estructura Arquitectónica del Código}
+
+\begin{lstlisting}[caption=Estructura de carpetas principales]
+proyecto/
+├── backend/
+│   ├── main.py           # FastAPI app y endpoints
+│   ├── agent.py          # Agente ReAct y herramientas
+│   ├── database.py       # Conexión y queries a PostgreSQL
+│   ├── config.yaml       # Configuración de métricas
+│   ├── requirements.txt  # Dependencias Python
+│   └── test_*.py         # Tests unitarios
+├── frontend/
+│   ├── app/
+│   │   ├── page.tsx      # Página principal
+│   │   └── layout.tsx    # Layout
+│   ├── components/
+│   │   ├── chatbot.tsx   # Componente Chat
+│   │   ├── dynamic-visualization.tsx
+│   │   └── app-sidebar.tsx
+│   ├── package.json      # Dependencias Node
+│   └── tsconfig.json     # Configuración TypeScript
+├── data/
+│   └── *.csv             # Datasets brutos
+├── docker-compose.yml    # Orquestación de servicios
+└── *.py                  # Scripts ETL y utilidades
+\end{lstlisting}
+
+\subsection{Ciclo de Vida de una Consulta}
+
+Para ilustrar la dinámica completa del sistema, presentamos el ciclo de vida detallado de una consulta típica:
+
+\begin{enumerate}
+    \item \textbf{Entrada}: Usuario escribe en el chat: \textit{"¿Cuál ha sido la tendencia del PIB?"}
+    
+    \item \textbf{Transmisión}: El frontend envía \texttt{POST /chat} con el texto al backend.
+    
+    \item \textbf{Normalización}: El backend normaliza la entrada (minúsculas, espacios en blanco).
+    
+    \item \textbf{Razonamiento Inicial}: El LLM (Llama 3.1) analiza la pregunta:
+    \begin{itemize}
+        \item Detecta que se solicita información sobre \textbf{PIB}.
+        \item Decide que necesita ejecutar una herramienta de query.
+    \end{itemize}
+    
+    \item \textbf{Matching de Métrica}: Se busca \textit{"PIB"} en alias del config.yaml:
+    \begin{itemize}
+        \item Coincidencia encontrada: \textit{Producto Interno Bruto}.
+    \end{itemize}
+    
+    \item \textbf{Generación de URL}: La herramienta \texttt{buscar\_y\_graficar} construye URL Grafana:
+    \begin{itemize}
+        \item \texttt{http://localhost:3000/d/adj4dk7/visor?var-metrica=PIB\&kiosk}
+    \end{itemize}
+    
+    \item \textbf{Observación y Reflexión}: El agente recibe la URL, reflexiona que tiene suficiente para responder.
+    
+    \item \textbf{Generación de Respuesta}: El LLM formula respuesta en lenguaje natural:
+    \begin{itemize}
+        \item \textit{"He generado una visualización del PIB de España (2000-2023). Puedes ver la evolución completa en el gráfico embebido. El PIB mostró crecimiento general hasta 2008, con una caída significativa en la crisis financiera, y recuperación desde 2010 en adelante."}
+    \end{itemize}
+    
+    \item \textbf{Envío JSON}: Backend responde con JSON:
+    \begin{lstlisting}[language=json, caption=Respuesta del backend]
+{
+    "respuesta": "He generado una visualización... <URL embebida>",
+    "url_grafana": "http://localhost:3000/d/..."
+}
+    \end{lstlisting}
+    
+    \item \textbf{Renderización UI}: El frontend recibe y renderiza:
+    \begin{itemize}
+        \item Mensaje de texto en el chat.
+        \item Panel con gráfico de Grafana embebido debajo.
+    \end{itemize}
+    
+    \item \textbf{Interacción Posterior}: Usuario puede hacer seguimiento:
+    \begin{itemize}
+        \item \textit{"Compara el PIB con la estabilidad política"}
+        \item \textit{"¿Cuál fue el máximo histórico del PIB?"}
+    \end{itemize}
+\end{enumerate}
+
+\section{Decisiones de Diseño Clave}
+
+\subsection{Privacidad y Soberanía de Datos}
+
+Se optó por un despliegue \textbf{completamente local} del LLM (Ollama) en lugar de usar APIs cloud como OpenAI GPT o Google PaLM:
+
+\begin{itemize}
+    \item \textbf{Ventaja}: Los datos nunca salen del servidor local. Privacidad y cumplimiento normativo (RGPD).
+    \item \textbf{Trade-off}: El modelo Llama 3.1 tiene ligeramente menor capacidad que GPT-4, pero es más que adecuado para tareas NLP estructuradas (parsing de preguntas, matching léxico).
+\end{itemize}
+
+\subsection{Modularidad y Extensibilidad}
+
+La configuración de métricas en YAML permite agregar nuevos indicadores sin modificar código:
+
+\begin{itemize}
+    \item Un data engineer puede agregar nuevas métricas editando \texttt{config.yaml}.
+    \item Los alias facilitan el reconocimiento multilingüe (español, inglés).
+    \item Los dashboards de Grafana se reutilizan parametrizados por métrica.
+\end{itemize}
+
+\subsection{Segregación de Responsabilidades}
+
+Cada componente tiene un único propósito bien definido:
+
+\begin{itemize}
+    \item \textbf{Frontend}: Presentación y UX.
+    \item \textbf{API}: Coordinar y exponer funcionalidades.
+    \item \textbf{Agente}: Razonamiento lógico y coordinación de herramientas.
+    \item \textbf{BD}: Persistencia y queries analíticos.
+    \item \textbf{Grafana}: Visualización especializada.
+\end{itemize}
+
+Esta arquitectura microservicios facilita:
+\begin{itemize}
+    \item Testing independiente de cada componente.
+    \item Escalabilidad horizontal (replicar servicios sin estado).
+    \item Mantenimiento y evolución sin cambios en cascada.
+\end{itemize}
+
+\section{Conclusión}
+
+El diseño e implementación del sistema SOS Food - Prototipo Local demuestra una arquitectura robusta, escalable y orientada a usuario final. La alternancia entre fases de análisis, diseño y desarrollo incremental permitió validar supuestos tempranamente y incorporar mejoras de forma ágil. El uso de tecnologías modernas (Next.js, FastAPI, LangGraph, Ollama) garantiza un sistema mantenible, seguro y preparado para future extensiones hacia ambientes productivos más amplios.
+
+\end{document}
