@@ -1,4 +1,3 @@
-import yaml
 import os
 import re
 import urllib.parse
@@ -6,23 +5,19 @@ from langchain_ollama import ChatOllama
 from langchain_core.tools import tool
 from langchain_core.messages import SystemMessage
 from langgraph.prebuilt import create_react_agent
-from database import run_query
+from database import db
 import difflib
+from metricas_config import MetricasConfig
 
 _SARIMAX_SCRIPTS_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'Sarimax', 'scripts'))
 
 # 1. Configuración del Modelo
-llm = ChatOllama(model="qwen2.5", temperature=0)
 
 # 2. Cargar Configuración de Métricas
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.yaml")
 
-def load_metrics_config():
-    with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-        return yaml.safe_load(f).get('datasets', [])
-
-DATASETS = load_metrics_config()
+catalogo = MetricasConfig(CONFIG_PATH)
 
 # 3. Definición de Herramientas (Tools)
 
@@ -35,6 +30,18 @@ def __obtener_query_paises(paises_str: str) -> str:
     if not parts:
         return f"&var-pais={urllib.parse.quote('España')}"
     return "".join([f"&var-pais={urllib.parse.quote(p.title())}" for p in parts])
+
+
+PAISES_CONOCIDOS = ["España", "Alemania", "Italia"]  # países cargados en la BD
+
+def __extraer_paises_de_texto(texto: str) -> str:
+    """Detecta países conocidos en 'texto' y los devuelve como cadena
+    separada por comas, lista para el parámetro 'paises'."""
+    t = texto.lower()
+    encontrados = [p for p in PAISES_CONOCIDOS if p.lower() in t]
+    return ", ".join(encontrados)
+
+
 @tool
 def buscar_y_graficar(query: str, paises: str = "") -> str:
     """
@@ -44,91 +51,19 @@ def buscar_y_graficar(query: str, paises: str = "") -> str:
     Puede indicarse uno o varios "paises" si el usuario lo pide.
     """
     print(f"🔎 DEBUG: Buscando y graficando: '{query}' en '{paises}'")
-    query_norm = query.lower().strip()
-    
-    # PASO 1: Buscar coincidencia EXACTA en alias (prioridad máxima)
-    for ds in DATASETS:
-        for alias in ds.get('alias', []):
-            if alias.lower() == query_norm or query_norm in alias.lower():
-                nombre_metrica = ds['nombre']
-                print(f"   ✅ Coincidencia exacta en alias: '{alias}' -> {nombre_metrica}")
-                
-                base_url = "http://localhost:3000"
-                #dashboard_uid = "adgmg5p"
-                dashboard_uid = "adj4dk7"
-                nombre_safe = urllib.parse.quote(nombre_metrica)
-                #url = f"{base_url}/d/{dashboard_uid}/visor-datos?var-metrica={nombre_safe}&kiosk"
-                url = f"{base_url}/d/{dashboard_uid}/visor-actualizable?var-metrica={nombre_safe}{__obtener_query_paises(paises)}&kiosk"
-
-                print(f"URL Generada: {url}")
-                return url
-    
-    # PASO 2: Buscar palabras clave en nombre/descripción
-    query_words = [w for w in query_norm.split() if len(w) > 2]
-    
-    best_match_ds = None
-    max_matches = 0
-    
-    for ds in DATASETS:
-        nombre_lower = ds['nombre'].lower()
-        # Contar cuántas palabras conectan
-        matches = sum(1 for word in query_words if word in nombre_lower)
-        if matches > max_matches:
-            max_matches = matches
-            best_match_ds = ds
-            
-    if max_matches > 0:
-        nombre_metrica = best_match_ds['nombre']
-        print(f"Mejor coincidencia por palabra clave: {nombre_metrica} ({max_matches} palabras)")
-        
-        base_url = "http://localhost:3000"
-        dashboard_uid = "adj4dk7"
-        nombre_safe = urllib.parse.quote(nombre_metrica)
-        url = f"{base_url}/d/{dashboard_uid}/visor-actualizable?var-metrica={nombre_safe}{__obtener_query_paises(paises)}&kiosk"
-
-        print(f"URL Generada: {url}")
-        return url
-    
-    # PASO 3: Fuzzy matching como último recurso
-    search_options = []
-    for ds in DATASETS:
-        search_options.append({'text': ds['nombre'].lower(), 'dataset': ds})
-        for alias in ds.get('alias', []):
-            search_options.append({'text': alias.lower(), 'dataset': ds})
-    
-    all_texts = [opt['text'] for opt in search_options]
-    
-    print(f"Buscando coincidencias fuzzy...")
-    matches = difflib.get_close_matches(query_norm, all_texts, n=3, cutoff=0.4)  # Umbral más alto
-    
-    if not matches:
-        print("No se encontraron coincidencias.")
+    if not paises:
+        paises = __extraer_paises_de_texto(query)
+    m = catalogo.buscar(query)
+    if m is None:
         return "No encontré esa métrica. Intenta con: 'pib', 'obesidad', 'población', 'cereales', etc."
-    
-    best_match_text = matches[0]
-    print(f"Fuzzy match: '{best_match_text}'")
-    
-    dataset = None
-    for opt in search_options:
-        if opt['text'] == best_match_text:
-            dataset = opt['dataset']
-            break
-    
-    if not dataset:
-        return "Error interno: no se pudo recuperar el dataset."
-    
-    nombre_metrica = dataset['nombre']
-    print(f"Métrica seleccionada: {nombre_metrica}")
-    
     base_url = "http://localhost:3000"
-    #dashboard_uid = "adgmg5p"
     dashboard_uid = "adj4dk7"
-    nombre_safe = urllib.parse.quote(nombre_metrica)
-    #url = f"{base_url}/d/{dashboard_uid}/visor-datos?var-metrica={nombre_safe}&kiosk"
+    nombre_safe = urllib.parse.quote(m.nombre)
     url = f"{base_url}/d/{dashboard_uid}/visor-actualizable?var-metrica={nombre_safe}{__obtener_query_paises(paises)}&kiosk"
-
     print(f"URL Generada: {url}")
     return url
+
+
 
 @tool
 def comparar_metricas(metricas: str, paises: str = "") -> str:
@@ -141,8 +76,8 @@ def comparar_metricas(metricas: str, paises: str = "") -> str:
     Ejemplo: "población rural y urbana", "pib, obesidad, cereales"
     """
     print(f"DEBUG: Comparando métricas: '{metricas}' en '{paises}'")
-    
-    # Separar por comas o 'y'
+    if not paises:                                 
+        paises = __extraer_paises_de_texto(metricas)
     separadores = [',', ' y ', ' e ']
     queries = [metricas]
     for sep in separadores:
@@ -150,97 +85,31 @@ def comparar_metricas(metricas: str, paises: str = "") -> str:
         for q in queries:
             new_queries.extend([s.strip() for s in q.split(sep)])
         queries = new_queries
-    
-    print(f"Queries individuales: {queries}")
-    
-    # Buscar cada métrica usando la MISMA lógica que buscar_y_graficar
+
     nombres_metricas = []
-    
-    for query in queries:
-        query_norm = query.lower().strip()
-        if len(query_norm) < 3:
+    for q in queries:
+        if len(q.strip()) < 3:
             continue
-        
-        encontrado = False
-        
-        # PASO 1: Coincidencia exacta en alias
-        for ds in DATASETS:
-            for alias in ds.get('alias', []):
-                if alias.lower() == query_norm or query_norm in alias.lower():
-                    nombre = ds['nombre']
-                    if nombre not in nombres_metricas:
-                        nombres_metricas.append(nombre)
-                        print(f"Alias exacto: '{alias}' -> {nombre}")
-                        encontrado = True
-                        break
-            if encontrado:
-                break
-        
-        if encontrado:
-            continue
-        
-        # PASO 2: Palabras clave en nombre
-        query_words = [w for w in query_norm.split() if len(w) > 2]
-        best_match_ds = None
-        max_matches = 0
-        
-        for ds in DATASETS:
-            nombre_lower = ds['nombre'].lower()
-            matches = sum(1 for word in query_words if word in nombre_lower)
-            if matches > max_matches:
-                max_matches = matches
-                best_match_ds = ds
-                
-        if max_matches > 0:
-            nombre = best_match_ds['nombre']
-            if nombre not in nombres_metricas:
-                nombres_metricas.append(nombre)
-                print(f"Palabra clave principal: {nombre} ({max_matches} palabras)")
-                encontrado = True
-        
-        if encontrado:
-            continue
-        
-        # PASO 3: Fuzzy matching
-        search_options = []
-        for ds in DATASETS:
-            search_options.append({'text': ds['nombre'].lower(), 'dataset': ds})
-            for alias in ds.get('alias', []):
-                search_options.append({'text': alias.lower(), 'dataset': ds})
-        
-        all_texts = [opt['text'] for opt in search_options]
-        matches = difflib.get_close_matches(query_norm, all_texts, n=1, cutoff=0.4)
-        
-        if matches:
-            best_match = matches[0]
-            for opt in search_options:
-                if opt['text'] == best_match:
-                    nombre = opt['dataset']['nombre']
-                    if nombre not in nombres_metricas:
-                        nombres_metricas.append(nombre)
-                        print(f"Fuzzy: '{best_match}' -> {nombre}")
-                    break
-    
+        m = catalogo.buscar(q)
+        if m is not None and m.nombre not in nombres_metricas:
+            nombres_metricas.append(m.nombre)
+
     if len(nombres_metricas) == 0:
         return "No encontré ninguna métrica para comparar."
-    
-    if len(nombres_metricas) == 1:
-        # Si solo encontró 1, devolver URL simple en lugar de error
-        base_url = "http://localhost:3000"
-        dashboard_uid = "adj4dk7"
-        nombre_safe = urllib.parse.quote(nombres_metricas[0])
-        return f"{base_url}/d/{dashboard_uid}/visor-actualizable?var-metrica={nombre_safe}{__obtener_query_paises(paises)}&kiosk"
-    
-    # Generar URL con múltiples variables
+
     base_url = "http://localhost:3000"
     dashboard_uid = "adj4dk7"
-    
-    params = "&".join([f"var-metrica={urllib.parse.quote(m)}" for m in nombres_metricas])
+    if len(nombres_metricas) == 1:
+        nombre_safe = urllib.parse.quote(nombres_metricas[0])
+        return f"{base_url}/d/{dashboard_uid}/visor-actualizable?var-metrica={nombre_safe}{__obtener_query_paises(paises)}&kiosk"
+
+    params = "&".join([f"var-metrica={urllib.parse.quote(n)}" for n in nombres_metricas])
     url = f"{base_url}/d/{dashboard_uid}/visor-actualizable?{params}{__obtener_query_paises(paises)}&kiosk"
-    
     print(f"URL de comparación generada con {len(nombres_metricas)} métricas")
-    
     return url
+
+
+
 
 @tool
 def comparar_paises(metrica: str, paises: str) -> str:
@@ -254,60 +123,13 @@ def comparar_paises(metrica: str, paises: str) -> str:
     Parámetro 'paises': Países separados por comas o 'y'.
     """
     print(f"DEBUG: Comparando países: métrica='{metrica}' paises='{paises}'")
-
-    query_norm = metrica.lower().strip()
-    metrica_encontrada = None
-
-    # PASO 1: Coincidencia exacta en alias
-    for ds in DATASETS:
-        for alias in ds.get('alias', []):
-            if alias.lower() == query_norm or query_norm in alias.lower():
-                metrica_encontrada = ds
-                print(f"   ✅ Alias exacto: '{alias}' -> {ds['nombre']}")
-                break
-        if metrica_encontrada:
-            break
-
-    # PASO 2: Palabras clave en nombre
-    if not metrica_encontrada:
-        query_words = [w for w in query_norm.split() if len(w) > 2]
-        best_match_ds = None
-        max_matches = 0
-        for ds in DATASETS:
-            nombre_lower = ds['nombre'].lower()
-            matches = sum(1 for word in query_words if word in nombre_lower)
-            if matches > max_matches:
-                max_matches = matches
-                best_match_ds = ds
-        if max_matches > 0:
-            metrica_encontrada = best_match_ds
-            print(f"   Palabra clave: {best_match_ds['nombre']} ({max_matches} palabras)")
-
-    # PASO 3: Fuzzy matching
-    if not metrica_encontrada:
-        search_options = []
-        for ds in DATASETS:
-            search_options.append({'text': ds['nombre'].lower(), 'dataset': ds})
-            for alias in ds.get('alias', []):
-                search_options.append({'text': alias.lower(), 'dataset': ds})
-        all_texts = [opt['text'] for opt in search_options]
-        fuzzy = difflib.get_close_matches(query_norm, all_texts, n=1, cutoff=0.4)
-        if fuzzy:
-            for opt in search_options:
-                if opt['text'] == fuzzy[0]:
-                    metrica_encontrada = opt['dataset']
-                    print(f"   Fuzzy: '{fuzzy[0]}' -> {opt['dataset']['nombre']}")
-                    break
-
-    if not metrica_encontrada:
+    m = catalogo.buscar(metrica)
+    if m is None:
         return "No encontré esa métrica. Intenta con: 'pib', 'obesidad', 'población', 'cereales', etc."
+    nombre_metrica = m.nombre
 
-    nombre_metrica = metrica_encontrada['nombre']
-
-    # Parsear países
     parts = re.split(r',|\by\b|\be\b', paises, flags=re.IGNORECASE)
     parts = [p.strip() for p in parts if len(p.strip()) > 2]
-
     if not parts:
         return "Por favor indica al menos un país. Ejemplo: 'España y Francia'."
 
@@ -316,9 +138,12 @@ def comparar_paises(metrica: str, paises: str) -> str:
     nombre_safe = urllib.parse.quote(nombre_metrica)
     query_paises = "".join([f"&var-pais={urllib.parse.quote(p.title())}" for p in parts])
     url = f"{base_url}/d/{dashboard_uid}/visor-actualizable?var-metrica={nombre_safe}{query_paises}&kiosk"
-
     print(f"URL comparación de países generada: {url}")
     return url
+
+
+
+
 
 @tool
 def consultar_datos_sql(pregunta: str) -> str:
@@ -337,53 +162,13 @@ def consultar_datos_sql(pregunta: str) -> str:
     print(f"DEBUG: Consulta SQL para: '{pregunta}'")
     pregunta_lower = pregunta.lower()
     
-    # Detectar la métrica usando la MISMA lógica que buscar_y_graficar
-    metrica_encontrada = None
-    
-    # PASO 1: Coincidencia exacta en alias
-    for ds in DATASETS:
-        for alias in ds.get('alias', []):
-            if alias.lower() in pregunta_lower:
-                metrica_encontrada = ds
-                print(f"Alias encontrado: '{alias}'")
-                break
-        if metrica_encontrada:
-            break
-    
-    # PASO 2: Palabras clave en nombre (solo si no encontró en alias)
-    if not metrica_encontrada:
-        query_words = [w for w in pregunta_lower.split() if len(w) > 3]
-        for ds in DATASETS:
-            nombre_lower = ds['nombre'].lower()
-            # Buscar coincidencia de palabras clave
-            matches = sum(1 for word in query_words if word in nombre_lower)
-            if matches >= 2:  # Al menos 2 palabras coinciden
-                metrica_encontrada = ds
-                print(f"Palabras clave en nombre")
-                break
-    
-    # PASO 3: Fuzzy matching como último recurso
-    if not metrica_encontrada:
-        search_options = []
-        for ds in DATASETS:
-            search_options.append({'text': ds['nombre'].lower(), 'dataset': ds})
-            for alias in ds.get('alias', []):
-                search_options.append({'text': alias.lower(), 'dataset': ds})
-        
-        all_texts = [opt['text'] for opt in search_options]
-        matches = difflib.get_close_matches(pregunta_lower, all_texts, n=1, cutoff=0.4)
-        
-        if matches:
-            for opt in search_options:
-                if opt['text'] == matches[0]:
-                    metrica_encontrada = opt['dataset']
-                    print(f"Fuzzy match")
-                    break
-    
-    if not metrica_encontrada:
+    # Identificar la métrica mediante el catálogo (alias en la frase -> palabras clave -> fuzzy)
+    m = catalogo.buscar(pregunta, alias_en_texto=True, min_long=3, min_coincidencias=2)
+    if m is None:
         return "No pude identificar la métrica. Por favor especifica: PIB, obesidad, población, etc."
-    
-    nombre_metrica = metrica_encontrada['nombre']
+
+    nombre_metrica = m.nombre
+    metrica_encontrada = {"nombre": m.nombre, "unidad": m.unidad, "insights": m.insights}
     print(f"   📊 Métrica identificada: {nombre_metrica}")
 
     # Detectar país mencionado (solo los países disponibles en la BD)
@@ -401,6 +186,10 @@ def consultar_datos_sql(pregunta: str) -> str:
     pais_filter = f"AND d.pais = '{pais_encontrado}'" if pais_encontrado else ""
     pais_label = f" en {pais_encontrado}" if pais_encontrado else ""
     print(f"   🌍 País: {pais_encontrado or 'sin filtro'}")
+
+    # Año mencionado en la pregunta (para acotar; p. ej. "desde 2020")
+    match_año = re.search(r'\b(19\d{2}|20\d{2})\b', pregunta_lower)
+    año_filtro = match_año.group(1) if match_año else None
 
     # Detectar tipo de consulta
     if any(word in pregunta_lower for word in ['promedio', 'media', 'average']):
@@ -447,13 +236,15 @@ def consultar_datos_sql(pregunta: str) -> str:
         """
         tipo = "conteo"
 
-    elif any(word in pregunta_lower for word in ['tendencia', 'evolución', 'evolucion', 'aumentado', 'disminuido']):
+    elif any(word in pregunta_lower for word in ['tendencia', 'evolución', 'evolucion', 'aument', 'disminu', 'reduc', 'crec', 'subiendo', 'sube', 'bajando', 'bajado', 'desde']):
+        # Por defecto, el primer valor de la serie; si se indica un año, desde ese año.
+        filtro_inicio = f"AND fecha >= '{año_filtro}-01-01'" if año_filtro else ""
         query = f"""
         WITH primer_valor AS (
             SELECT TO_CHAR(fecha, 'YYYY') as año, valor
             FROM datos d
             JOIN metricas m ON d.metrica_id = m.id
-            WHERE m.nombre = '{nombre_metrica}' {pais_filter}
+            WHERE m.nombre = '{nombre_metrica}' {pais_filter} {filtro_inicio}
             ORDER BY fecha ASC
             LIMIT 1
         ),
@@ -476,9 +267,8 @@ def consultar_datos_sql(pregunta: str) -> str:
         tipo = "tendencia"
 
     else:
-        match_año = re.search(r'\b(19\d{2}|20\d{2})\b', pregunta_lower)
-        if match_año:
-            año_consultado = match_año.group(1)
+        if año_filtro:
+            año_consultado = año_filtro
             query = f"""
             SELECT TO_CHAR(fecha, 'YYYY') as año, valor
             FROM datos d
@@ -501,7 +291,7 @@ def consultar_datos_sql(pregunta: str) -> str:
     print(f"Tipo de consulta: {tipo}")
     
     try:
-        resultados = run_query(query)
+        resultados = db.run_query(query)
         
         if not resultados:
             msg = f"No hay datos disponibles para {nombre_metrica}{pais_label}."
@@ -532,9 +322,17 @@ def consultar_datos_sql(pregunta: str) -> str:
         elif tipo == "tendencia":
             r = resultados[0]
             cambio = r['cambio']
-            direccion = "aumentado" if cambio > 0 else "disminuido"
+            if cambio > 0:
+                direccion = "aumentado"
+            elif cambio < 0:
+                direccion = "disminuido"
+            else:
+                direccion = "se ha mantenido"
             insight = metrica_encontrada.get('insights', '')
-            msg = f"{nombre_metrica}{pais_label} ha {direccion} de {r['valor_inicio']} ({r['año_inicio']}) a {r['valor_fin']} ({r['año_fin']}). Cambio total: {abs(cambio)} {metrica_encontrada['unidad']}.\n\nContexto: {insight}"
+            if direccion == "se ha mantenido":
+                msg = f"{nombre_metrica}{pais_label} se ha mantenido en {r['valor_fin']} entre {r['año_inicio']} y {r['año_fin']}.\n\nContexto: {insight}"
+            else:
+                msg = f"{nombre_metrica}{pais_label} ha {direccion} de {r['valor_inicio']} ({r['año_inicio']}) a {r['valor_fin']} ({r['año_fin']}). Cambio total: {abs(cambio)} {metrica_encontrada['unidad']}.\n\nContexto: {insight}"
             print(f"TOOL RETURN: {msg}")
             return msg
 
@@ -553,6 +351,10 @@ def consultar_datos_sql(pregunta: str) -> str:
     except Exception as e:
         print(f"Error SQL: {e}")
         return f"Error al consultar los datos: {str(e)}"
+    
+
+
+    
 
 @tool
 def describir_metrica(query: str) -> str:
@@ -562,59 +364,16 @@ def describir_metrica(query: str) -> str:
     Ejemplo: "¿qué es el PIB?", "descríbeme la obesidad", "explica la estabilidad política"
     """
     print(f"DEBUG: Describiendo métrica: '{query}'")
-    query_norm = query.lower().strip()
-    
-    metrica_encontrada = None
-    
-    # PASO 1: Coincidencia exacta en alias
-    for ds in DATASETS:
-        for alias in ds.get('alias', []):
-            if alias.lower() == query_norm or query_norm in alias.lower():
-                metrica_encontrada = ds
-                break
-        if metrica_encontrada:
-            break
-    
-    # PASO 2: Palabras clave en nombre
-    if not metrica_encontrada:
-        query_words = [w for w in query_norm.split() if len(w) > 2]
-        for ds in DATASETS:
-            nombre_lower = ds['nombre'].lower()
-            if any(word in nombre_lower for word in query_words):
-                metrica_encontrada = ds
-                break
-    
-    # PASO 3: Fuzzy matching
-    if not metrica_encontrada:
-        search_options = []
-        for ds in DATASETS:
-            search_options.append({'text': ds['nombre'].lower(), 'dataset': ds})
-            for alias in ds.get('alias', []):
-                search_options.append({'text': alias.lower(), 'dataset': ds})
-        
-        all_texts = [opt['text'] for opt in search_options]
-        matches = difflib.get_close_matches(query_norm, all_texts, n=1, cutoff=0.4)
-        
-        if matches:
-            for opt in search_options:
-                if opt['text'] == matches[0]:
-                    metrica_encontrada = opt['dataset']
-                    break
-    
-    if not metrica_encontrada:
+    m = catalogo.buscar(query)
+    if m is None:
         return "No encontré esa métrica. Intenta con: 'pib', 'obesidad', 'población', 'cereales', etc."
-    
-    nombre = metrica_encontrada['nombre']
-    descripcion = metrica_encontrada.get('descripcion', 'Sin descripción disponible.')
-    unidad = metrica_encontrada.get('unidad', 'No especificada')
-    insights = metrica_encontrada.get('insights', 'No hay análisis disponible.')
-    
     return (
-        f"**{nombre}**\n\n"
-        f"Descripción: {descripcion}\n\n"
-        f"Unidad de medida: {unidad}\n\n"
-        f"Análisis e interpretación: {insights}"
+        f"**{m.nombre}**\n\n"
+        f"Descripción: {m.descripcion or 'Sin descripción disponible.'}\n\n"
+        f"Unidad de medida: {m.unidad or 'No especificada'}\n\n"
+        f"Análisis e interpretación: {m.insights or 'No hay análisis disponible.'}"
     )
+
 
 @tool
 def listar_metricas_disponibles() -> str:
@@ -622,11 +381,10 @@ def listar_metricas_disponibles() -> str:
     Lista TODAS las métricas disponibles en el sistema.
     Úsala cuando el usuario pregunte "¿qué datos tienes?" o "¿qué puedo ver?"
     """
-    lista = []
-    for ds in DATASETS:
-        lista.append(f"- {ds['nombre']}")
-    
-    return "INSTRUCCIÓN AL AGENTE: Debes mostrar esta lista EXACTA y COMPLETA al usuario. No omitas nada:\n\nMétricas disponibles (" + str(len(lista)) + " total):\n" + "\n".join(lista)
+    lista = [f"- {n}" for n in catalogo.listar_nombres()]
+    return "Métricas disponibles (" + str(len(lista)) + " total):\n" + "\n".join(lista)
+
+
 
 @tool
 def ir_al_dashboard_principal(paises: str = "") -> str:
@@ -665,7 +423,6 @@ def predecir_trigo_grecia(dummy: str = "") -> str:
     return _sarimax_script.predecir_trigo_grecia.func(dummy)
 
 # 4. Creación del Agente
-tools = [buscar_y_graficar, comparar_metricas, comparar_paises, consultar_datos_sql, describir_metrica, listar_metricas_disponibles, predecir_trigo_grecia, ir_al_dashboard_principal]
 
 system_prompt = """Eres un asistente de datos. Tu ÚNICA función es usar las herramientas disponibles y devolver EXACTAMENTE lo que ellas te respondan.
 
@@ -710,29 +467,89 @@ TU ACCIÓN: Ejecuta `predecir_trigo_grecia()`.
 NO INVENTES URLES. USA LAS HERRAMIENTAS DIRECTAMENTE.
 """
 
-agent_executor = create_react_agent(llm, tools, prompt=SystemMessage(content=system_prompt))
+class AgentService:
+    """Servicio de orquestación del agente conversacional.
 
-def chat_with_agent(user_input: str):
-    """Función principal para llamar desde la API"""
-    try:
-        response = agent_executor.invoke(
-            {"messages": [("user", user_input)]},
-            config={"recursion_limit": 50}
+    Ensambla el LLM (ChatOllama), el conjunto de herramientas y el grafo de
+    razonamiento ReAct (LangGraph), y expone chat_with_agent como punto de
+    entrada único para todas las conversaciones.
+    """
+
+    PASSTHROUGH_TOOLS = {
+        "predecir_trigo_grecia", "listar_metricas_disponibles", "buscar_y_graficar",
+        "comparar_metricas", "comparar_paises", "ir_al_dashboard_principal",
+        "consultar_datos_sql", "describir_metrica",
+    }
+
+    MENSAJE_POR_DEFECTO = (
+        "No he podido procesar esa pregunta. Puedo mostrarte el gráfico de una "
+        "métrica, compararla entre varias métricas o países, darte un valor "
+        "concreto (promedio, máximo, mínimo, tendencia o el dato de un año), "
+        "describir un indicador o listar los datos disponibles.\n\n"
+        "Por ejemplo: «muéstrame el PIB de Italia», «promedio de obesidad en "
+        "España», «compara la obesidad entre España y Alemania» o «¿qué datos tienes?»."
+    )
+
+    def __init__(self, model: str = "qwen2.5", temperature: float = 0) -> None:
+        self._llm = ChatOllama(model=model, temperature=temperature)
+        self._tools = [
+            buscar_y_graficar, comparar_metricas, comparar_paises, consultar_datos_sql,
+            describir_metrica, listar_metricas_disponibles, predecir_trigo_grecia,
+            ir_al_dashboard_principal,
+        ]
+        self._tools_por_nombre = {t.name: t for t in self._tools}
+        self._agent_executor = create_react_agent(
+            self._llm, self._tools, prompt=SystemMessage(content=system_prompt)
         )
-        
-        messages = response["messages"]
-        
-        # Para herramientas críticas, evitamos que el LLM resuma pasando directamente el texto
-        PASSTHROUGH_TOOLS = {"predecir_trigo_grecia", "listar_metricas_disponibles", "buscar_y_graficar", "comparar_metricas", "comparar_paises", "ir_al_dashboard_principal", "consultar_datos_sql", "describir_metrica"}
-        
-        for msg in reversed(messages):
-            msg_type = type(msg).__name__
-            # LangGraph usa ToolMessage para los outputs de herramientas
-            if msg_type == "ToolMessage" and getattr(msg, "name", None) in PASSTHROUGH_TOOLS:
-                return msg.content  # Devolver directo sin pasar por Llama
-        
-        # Para el resto de herramientas, devolver la respuesta del LLM normalmente
-        return messages[-1].content
-        
-    except Exception as e:
-        return f"Error procesando la solicitud: {str(e)}"
+
+    def chat_with_agent(self, user_input: str) -> str:
+        """Punto de entrada único para conversar con el agente."""
+        try:
+            response = self._agent_executor.invoke(
+                {"messages": [("user", user_input)]},
+                config={"recursion_limit": 50},
+            )
+            messages = response["messages"]
+
+            # Para herramientas críticas, devolvemos su salida tal cual.
+            for msg in reversed(messages):
+                if type(msg).__name__ == "ToolMessage" and getattr(msg, "name", None) in self.PASSTHROUGH_TOOLS:
+                    return msg.content
+
+            # Red de seguridad: a veces el LLM "escribe" la llamada a la
+            # herramienta como texto en lugar de ejecutarla. Si es el caso, la
+            # ejecutamos nosotros.
+            # Si ninguna herramienta se ejecutó, intentamos recuperar una llamada
+            # escrita como texto; si tampoco, devolvemos un mensaje por defecto
+            # en lugar del texto crudo (posiblemente alucinado) del modelo.
+            final = messages[-1].content
+            recuperado = self._ejecutar_si_es_tool_textual(final)
+            if recuperado is not None:
+                return recuperado
+            return self.MENSAJE_POR_DEFECTO
+        except Exception as e:
+            return f"Error procesando la solicitud: {str(e)}"
+
+    def _ejecutar_si_es_tool_textual(self, contenido: str):
+        """Detecta una llamada a herramienta emitida como TEXTO por el LLM
+        (p. ej. 'consultar_datos_sql({"pregunta": "..."})'), y si reconoce la
+        herramienta, la ejecuta y devuelve su resultado. Devuelve None si el
+        contenido no es una llamada reconocible.
+        """
+        import json
+        m = re.match(r'^\s*([A-Za-z_]\w*)\s*\((\{.*\})?\)\s*$', contenido.strip(), re.DOTALL)
+        if not m:
+            return None
+        nombre, args_json = m.group(1), m.group(2)
+        tool = self._tools_por_nombre.get(nombre)
+        if tool is None:
+            return None
+        try:
+            args = json.loads(args_json) if args_json else {}
+            return tool.invoke(args)
+        except Exception:
+            return None
+
+
+# Instancia única del servicio, usada por la API (main.py).
+agent_service = AgentService()

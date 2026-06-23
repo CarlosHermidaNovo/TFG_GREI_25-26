@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { BarChart3 } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 
@@ -8,10 +9,16 @@ const BASE_URL = "http://localhost:3000/d/adgmg5p/visor-datos?orgId=1&kiosk"
 export function GrafanaPanel() {
   const searchParams = useSearchParams()
   const paises = searchParams.getAll("pais")
-  
+  const [defaultCountry, setDefaultCountry] = useState("España")
+
+  useEffect(() => {
+    const saved = localStorage.getItem("sosfood_default_country")
+    if (saved) setDefaultCountry(saved)
+  }, [])
+
   let finalUrl = BASE_URL
   if (paises.length === 0) {
-    finalUrl += "&var-pais=Espa%C3%B1a"
+    finalUrl += `&var-pais=${encodeURIComponent(defaultCountry)}`
   } else {
     paises.forEach(pais => {
       finalUrl += `&var-pais=${encodeURIComponent(pais)}`

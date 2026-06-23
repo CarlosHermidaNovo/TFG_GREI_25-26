@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from agent import chat_with_agent
+from agent import agent_service
 
 app = FastAPI(title="Backend TFG - Datos FAO")
 
@@ -43,7 +43,7 @@ async def chat_endpoint(request: ChatRequest):
     """
     try:
         print(f"📩 Recibido: {request.texto}")
-        respuesta_agente = chat_with_agent(request.texto)
+        respuesta_agente = agent_service.chat_with_agent(request.texto)
         print(f"🤖 Respuesta: {respuesta_agente}")
         return ChatResponse(respuesta=respuesta_agente)
     except Exception as e:

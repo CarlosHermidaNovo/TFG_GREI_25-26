@@ -19,7 +19,7 @@ const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/" },
   { label: "Trigo en Grecia", icon: Wheat, href: "/trigo" },
   { label: "Visualizaciones de usuario", icon: BarChart3, href: "/visualizaciones" },
-  { label: "Ajustes", icon: Settings, href: "#" },
+  { label: "Ajustes", icon: Settings, href: "/ajustes" },
 ]
 
 export function AppSidebar() {
